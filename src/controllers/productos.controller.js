@@ -75,4 +75,39 @@ async function remove(req, res) {
   return res.status(204).send()
 }
 
-module.exports = { getAll, getAllVisible, getById, create, update, remove }
+async function search(req, res) {
+  try {
+    const { nombre, minPrecio, maxPrecio, page = 1, limit = 5 } = req.query;
+
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const minP = minPrecio ? Number(minPrecio) : null;
+    const maxP = maxPrecio ? Number(maxPrecio) : null;
+
+    if (isNaN(pageNum) || isNaN(limitNum) || pageNum < 1 || limitNum < 1) {
+      return res.status(400).json({ error: 'Page y Limit deben ser números positivos' });
+    }
+
+    const result = await repo.search({
+      nombre,
+      minPrecio: minP,
+      maxPrecio: maxP,
+      page: pageNum,
+      limit: limitNum
+    });
+
+    return res.json({
+      data: result.data,
+      page: pageNum,
+      limit: limitNum,
+      total: result.total
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}
+
+
+module.exports = { getAll, getAllVisible, getById, create, update, remove, search };

@@ -14,7 +14,6 @@ class ProductosRepository {
       'select id, nombre, precio from productos where activo = true;'
     );
     return result.rows;
-    // return this.productos.filter(producto => producto.active);
   }
 
   async getById(id) {
@@ -22,7 +21,7 @@ class ProductosRepository {
       'select id, nombre, precio, stock, descripcion from productos where activo = true and id = $1;', [id]
     );
     return result.rows[0];
-    // return this.productos.find(producto => producto.id === id);
+
   }
 
   async create(nombre, precio) {
@@ -30,19 +29,10 @@ class ProductosRepository {
       'insert into productos (nombre, precio) values ($1,$2) returning id, nombre, precio;',[nombre, precio] 
     );
     return result.rows[0];
-    // const newProducto = { id: this.nextId++, nombre, precio };
-    // this.productos.push(newProducto);
-    // return newProducto;
+
   }
   async update(id, data) {
-    /*const producto = await this.getById(id);
-    if (producto) {
-      producto.nombre = data.nombre;
-      producto.precio = data.precio;
-      return producto;
-    }
-    return null;
-    */
+
     const result = await pool.query(
       'UPDATE productos SET nombre = coalesce($1, nombre), precio = coalesce($2, precio) WHERE id = $3 returning id, nombre, precio',
       [data.nombre ?? null, data.precio ?? null, data.id]
@@ -50,18 +40,65 @@ class ProductosRepository {
     return result.rows[0] || null
   }
 
-  async delete(id) {
-    /*const index = this.productos.findIndex(producto => producto.id === id);
-    if (index !== -1) {
-      return this.productos.splice(index, 1)[0];
-    }
-    return null;
-    */
-   const result = await pool.query(
-    'DELETE FROM productos WHERE id = $1 returning id', [id]
-   )
+async delete(id) {
+  /*const index = this.productos.findIndex(producto => producto.id === id);
+  if (index !== -1) {
+    return this.productos.splice(index, 1)[0];
+  }
+  return null;
+  */
+ const result = await pool.query(
+  'DELETE FROM productos WHERE id = $1 returning id', [id]
+ )
 
-   return result.rows[0] || null
+ return result.rows[0] || null
+}
+
+async search({ nombre, minPrecio, maxPrecio, page, limit }) {
+    let query = 'SELECT id, nombre, precio FROM productos WHERE 1=1';
+    let countQuery = 'SELECT count(*) as total FROM productos WHERE 1=1';
+    const values = [];
+    let counter = 1;
+
+
+    if (nombre) {
+      const clause = ` AND nombre ILIKE $${counter}`;
+      query += clause;
+      countQuery += clause;
+      values.push(`%${nombre}%`);
+      counter++;
+    }
+
+    if (minPrecio !== undefined && minPrecio !== null) {
+      const clause = ` AND precio >= $${counter}`;
+      query += clause;
+      countQuery += clause;
+      values.push(minPrecio);
+      counter++;
+    }
+
+    if (maxPrecio !== undefined && maxPrecio !== null) {
+      const clause = ` AND precio <= $${counter}`;
+      query += clause;
+      countQuery += clause;
+      values.push(maxPrecio);
+      counter++;
+    }
+
+    const countResult = await pool.query(countQuery, values);
+    const total = parseInt(countResult.rows[0].total, 10);
+
+    query += ` ORDER BY id DESC LIMIT $${counter} OFFSET $${counter + 1}`;
+    
+    const offset = (page - 1) * limit;
+    values.push(limit, offset);
+
+    const result = await pool.query(query, values);
+
+    return {
+      data: result.rows,
+      total: total
+    };
   }
 }
 
