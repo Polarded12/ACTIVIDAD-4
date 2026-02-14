@@ -54,12 +54,13 @@ async delete(id) {
  return result.rows[0] || null
 }
 
-async search({ nombre, minPrecio, maxPrecio, page, limit }) {
-    let query = 'SELECT id, nombre, precio FROM productos WHERE 1=1';
-    let countQuery = 'SELECT count(*) as total FROM productos WHERE 1=1';
+async search({ nombre, minPrecio, maxPrecio, page = 1, limit = 5 }) {
+    // 1. Iniciamos las queries asegurando que solo traiga productos ACTIVOS
+    let query = 'SELECT id, nombre, precio FROM productos WHERE activo = true';
+    let countQuery = 'SELECT count(*) as total FROM productos WHERE activo = true';
+    
     const values = [];
     let counter = 1;
-
 
     if (nombre) {
       const clause = ` AND nombre ILIKE $${counter}`;
@@ -88,18 +89,20 @@ async search({ nombre, minPrecio, maxPrecio, page, limit }) {
     const countResult = await pool.query(countQuery, values);
     const total = parseInt(countResult.rows[0].total, 10);
 
+    const offset = (page - 1) * limit;
+
     query += ` ORDER BY id DESC LIMIT $${counter} OFFSET $${counter + 1}`;
     
-    const offset = (page - 1) * limit;
     values.push(limit, offset);
 
     const result = await pool.query(query, values);
 
     return {
       data: result.rows,
+      page: Number(page),  
+      limit: Number(limit), 
       total: total
     };
   }
 }
-
 module.exports = { ProductosRepository }
